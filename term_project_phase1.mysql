@@ -1,0 +1,305 @@
+#STEP1. [VIEW 변환하기]
+
+#1. institutions (NEW: 4NF 정규화)
+CREATE VIEW view_institutions AS
+SELECT DISTINCT
+    published_institution,
+    publish_institution_url,
+    publish_Id
+FROM allrecords2
+WHERE published_institution IS NOT NULL AND publish_Id IS NOT NULL;
+
+#(중복확인)
+SELECT publish_Id, COUNT(*) AS count
+FROM view_institutions
+GROUP BY publish_Id
+HAVING COUNT(*) > 1;
+
+
+#2. documents (updated: publish_Id → FK)
+CREATE VIEW view_documents AS
+SELECT DISTINCT
+    hash_key,
+    doc_id,
+    publish_Id,
+    doc_type_Id,
+    post_date,
+    post_writer,
+    post_title,
+    post_body,
+    abstract,
+    original_url,
+    top_category,
+    doc_title,
+    topic
+FROM allrecords2
+WHERE hash_key IS NOT NULL AND doc_id IS NOT NULL;
+
+# 3. files
+CREATE VIEW view_files AS
+
+    (SELECT DISTINCT
+        file_id ,
+        file_content_id ,
+        file_name ,
+        file_download_url,
+        hash_key
+    FROM allrecords2
+    WHERE hash_key IS NOT NULL
+);
+
+#(중복확인)
+SELECT hash_key, file_id, COUNT(*) AS count
+FROM view_files
+GROUP BY hash_key, file_id
+HAVING COUNT(*) > 1;
+
+
+#4. document_keywords + (doc_title, topic) 정규화 필요
+CREATE VIEW  view_document_keywords AS(
+                                 SELECT DISTINCT
+                                   hash_key,
+                                   keyword
+                                  FROM allrecords2
+                                  WHERE hash_key IS NOT NULL
+);
+
+#(중복확인)
+SELECT hash_key, keyword, COUNT(*) AS count
+FROM view_document_keywords
+GROUP BY hash_key, keyword
+HAVING COUNT(*) > 1;
+
+#5. users
+CREATE VIEW view_users AS (
+                          SELECT DISTINCT
+                              id,
+                              email ,
+                              name ,
+                              institution ,
+                              title ,
+                              registered_date
+                          FROM allrecords2
+                          WHERE id IS NOT NULL
+                              );
+
+#(중복확인) - 중복없음
+SELECT id, COUNT(*) AS count
+FROM view_users
+GROUP BY id
+HAVING COUNT(*) > 1;
+
+# 6. saved_documents  (user_id, doc_id, topic 들어가지 않을까?
+
+CREATE VIEW view_saved_documents_m AS(
+                                   SELECT DISTINCT
+                                       saved_doc_hash_key,
+                                       user_id ,doc_id, topic, user_email,
+                                       saved_doc_date
+                                   FROM allrecords2
+                                   WHERE saved_doc_hash_key IS NOT NULL
+                                       );
+#(중복확인) - 중복없음
+SELECT saved_doc_hash_key, doc_id, user_id, saved_doc_date, user_email, COUNT(*) AS count
+FROM view_saved_documents_m
+GROUP BY saved_doc_hash_key, doc_id, user_id, saved_doc_date, user_email
+HAVING COUNT(*) > 1;
+
+# 7. announcements
+CREATE VIEW view_announcements AS(
+                        SELECT DISTINCT
+                               hash_key,
+                               category,
+                               announcement ,
+                               content ,
+                               user_id , #사용자 email
+                               reg_date,
+                               mod_date,
+                               is_main_announce
+                            FROM allrecords2
+                            WHERE hash_key IS NOT NULL
+);
+
+#(중복확인)
+SELECT hash_key, COUNT(*) AS count
+FROM view_announcements
+GROUP BY hash_key
+HAVING COUNT(*) > 1;
+
+SELECT *
+FROM allrecords2
+WHERE announcement IS NOT NULL AND user_id IS NULL;
+
+SELECT *
+FROM allrecords2
+WHERE announcement IS NOT NULL AND reg_date IS NULL;
+
+SELECT *
+FROM allrecords2
+WHERE announcement IS NOT NULL AND content IS NULL;
+
+SELECT *
+FROM allrecords2
+WHERE announcement IS NOT NULL AND mod_date IS NULL;
+
+#(수정 version)
+CREATE VIEW view_announcements_m AS(
+                                 SELECT DISTINCT
+                                     hash_key,
+                                     category,
+                                     announcement ,
+                                     content ,
+                                     reg_date,
+                                     mod_date,
+                                     is_main_announce
+                                 FROM allrecords2
+                                 WHERE hash_key IS NOT NULL
+                                     );
+
+#(중복확인) - 중복없음
+SELECT hash_key, announcement, reg_date, content, mod_date, COUNT(*) AS count
+FROM view_announcements_m
+GROUP BY hash_key, announcement,  reg_date, content, mod_date
+HAVING COUNT(*) > 1;
+
+
+
+#STEP2. [TABLE 정의하기]
+
+-- 1. institutions (NEW: 4NF 정규화)
+CREATE TABLE institutions (
+                              publish_Id TINYINT PRIMARY KEY,
+                              published_institution LONGTEXT,
+                              publish_institution_url LONGTEXT
+);
+
+-- 2. documents (updated: publish_Id → FK)
+CREATE TABLE documents (
+                   hash_key CHAR(20),
+                   publish_Id TINYINT,
+                   doc_id TINYINT,
+                   doc_type_Id TINYINT,
+                   post_date CHAR(10),
+                   post_writer LONGTEXT,
+                   post_title LONGTEXT,
+                   post_body LONGTEXT,
+                   abstract LONGTEXT,
+                   original_url LONGTEXT,
+                   top_category LONGTEXT,
+                   doc_title LONGTEXT,
+                   topic LONGTEXT,
+                   PRIMARY KEY (hash_key, doc_id),
+                   FOREIGN KEY (publish_Id) REFERENCES institutions(publish_id)
+);
+
+-- 3. files
+CREATE TABLE files (
+                       file_id CHAR(20) PRIMARY KEY,
+                       file_content_id SMALLINT,
+                       file_name LONGTEXT,
+                       file_download_url LONGTEXT,
+                       hash_key CHAR(20),
+                       FOREIGN KEY (hash_key) REFERENCES documents(hash_key)
+);
+
+-- 4. document_keywords
+CREATE TABLE document_keywords (
+                                   hash_key CHAR(20),
+                                   keyword VARCHAR(255),
+                                   PRIMARY KEY (hash_key, keyword),
+                                   FOREIGN KEY (hash_key) REFERENCES documents(hash_key)
+);
+
+-- 5. users
+CREATE TABLE users (
+                       user_id CHAR(20) PRIMARY KEY,
+                       user_email MEDIUMTEXT,
+                       name MEDIUMTEXT,
+                       institution MEDIUMTEXT,
+                       title MEDIUMTEXT,
+                       registered_date DATE
+);
+
+-- 6. saved_documents
+CREATE TABLE saved_documents (
+                                 user_id CHAR(20),
+                                 saved_doc_hash_key CHAR(20),
+                                 saved_doc_date DATE,
+                                 PRIMARY KEY (user_id, saved_doc_hash_key),
+                                 FOREIGN KEY (user_id) REFERENCES users(user_id),
+                                 FOREIGN KEY (saved_doc_hash_key) REFERENCES documents(hash_key)
+);
+
+-- 7. managers
+CREATE TABLE managers (
+                          id VARCHAR(255) PRIMARY KEY,
+                          email MEDIUMTEXT
+);
+
+-- 8. announcements
+CREATE TABLE announcements (
+                               hash_key CHAR(20),
+                               category CHAR(7),
+                               announcement TINYTEXT,
+                               content TEXT,
+                               user_id CHAR(20),
+                               reg_date BIGINT,
+                               mod_date BIGINT,
+                               is_main_announce TINYINT,
+                               PRIMARY KEY (hash_key, category, user_id),
+                               FOREIGN KEY (hash_key) REFERENCES documents(hash_key),
+                               FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
+
+
+
+#STEP3. [VIEW > TABLE 변환하기]
+
+#1. institutions
+INSERT INTO institutions (
+    publish_Id,
+    published_institution,
+    publish_institution_url
+)
+SELECT
+    publish_Id,
+    published_institution,
+    publish_institution_url
+FROM view_institutions;
+
+
+
+#2. documents
+INSERT INTO documents (
+    hash_key,
+    publish_Id,
+    doc_id,
+    doc_type_Id,
+    post_date,
+    post_writer,
+    post_title,
+    post_body,
+    abstract,
+    original_url,
+    top_category,
+    doc_title,
+    topic
+)
+SELECT
+    hash_key,
+    publish_Id,
+    doc_id,
+    doc_type_Id,
+    post_date,
+    post_writer,
+    post_title,
+    post_body,
+    abstract,
+    original_url,
+    top_category,
+    doc_title,
+    topic
+FROM view_documents;
+
+# ...

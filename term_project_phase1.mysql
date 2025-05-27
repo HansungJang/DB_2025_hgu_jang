@@ -17,23 +17,95 @@ HAVING COUNT(*) > 1;
 
 
 #2. documents (updated: publish_Id → FK)
-CREATE VIEW view_documents AS
+# CREATE VIEW view_documents AS
+# SELECT DISTINCT
+#     hash_key,
+#     doc_id, # 중복 발생시킴
+#     publish_Id,
+#     doc_type_Id,
+#     post_date,
+#     post_writer,
+#     post_title,
+#     post_body,
+#     abstract,
+#     original_url,
+#     top_category,
+#     doc_title # 중복을 발생시킴
+# FROM allrecords2
+# WHERE hash_key IS NOT NULL AND doc_id IS NOT NULL;
+# 
+# #(중복확인) - 중복 발생 X, doc_title null이 있음.
+# SELECT hash_key, doc_id, doc_title, doc_type_id, COUNT(*) AS count
+# FROM view_documents
+# GROUP BY hash_key, doc_id, doc_title, doc_type_id
+# HAVING COUNT(*) > 1;
+
+#2.1 document_id value set
+CREATE VIEW view_documents_id AS
 SELECT DISTINCT
     hash_key,
-    doc_id,
+    doc_id, #
+    doc_type_Id
+FROM allrecords2
+WHERE hash_key IS NOT NULL AND doc_id IS NOT NULL;
+
+#(중복확인) - 중복 발생 X, doc_title null이 있음.  #2. document_id 값 (새로운 table, MVD)
+# doc_id와 doc_title 분리
+SELECT hash_key, doc_id,  COUNT(*) AS count
+FROM view_documents_id
+GROUP BY hash_key, doc_id
+HAVING COUNT(*) > 1;
+
+SELECT *
+FROM allrecords2
+WHERE doc_id IS NOT NULL AND doc_type_Id IS NULL ;
+
+#2.2 document_title
+CREATE VIEW view_documents_title AS
+SELECT DISTINCT
+    hash_key,
+    doc_title,
+    doc_id
+FROM allrecords2
+WHERE hash_key IS NOT NULL AND doc_title IS NOT NULL;
+
+
+SELECT *
+FROM allrecords2
+WHERE doc_title IS NOT NULL AND doc_id IS NULL ;
+
+
+#(중복확인)
+SELECT hash_key, doc_title, doc_id, COUNT(*) AS count
+FROM view_documents_title
+GROUP BY hash_key, doc_title, doc_id
+HAVING COUNT(*) > 1;
+
+
+#2.3 document_post
+CREATE VIEW view_documents_post AS
+SELECT DISTINCT
+    hash_key,
     publish_Id,
-    doc_type_Id,
     post_date,
     post_writer,
     post_title,
     post_body,
     abstract,
     original_url,
-    top_category,
-    doc_title,
-    topic
+    top_category
 FROM allrecords2
-WHERE hash_key IS NOT NULL AND doc_id IS NOT NULL;
+WHERE hash_key IS NOT NULL AND publish_Id IS NOT NULL;
+
+SELECT *
+FROM allrecords2
+WHERE publish_Id IS NOT NULL AND doc_id IS NULL ;
+
+#(중복확인)
+SELECT hash_key, COUNT(*) AS count
+FROM view_documents_post
+GROUP BY hash_key
+HAVING COUNT(*) > 1;
 
 # 3. files
 CREATE VIEW view_files AS

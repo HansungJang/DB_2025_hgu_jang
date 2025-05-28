@@ -9,36 +9,14 @@ SELECT DISTINCT
 FROM allrecords2
 WHERE published_institution IS NOT NULL AND publish_Id IS NOT NULL;
 
-#(중복확인)
-SELECT publish_Id, COUNT(*) AS count
-FROM view_institutions
-GROUP BY publish_Id
-HAVING COUNT(*) > 1;
-
-
-#2. documents (updated: publish_Id → FK)
-# CREATE VIEW view_documents AS
-# SELECT DISTINCT
-#     hash_key,
-#     doc_id, # 중복 발생시킴
-#     publish_Id,
-#     doc_type_Id,
-#     post_date,
-#     post_writer,
-#     post_title,
-#     post_body,
-#     abstract,
-#     original_url,
-#     top_category,
-#     doc_title # 중복을 발생시킴
-# FROM allrecords2
-# WHERE hash_key IS NOT NULL AND doc_id IS NOT NULL;
-# 
-# #(중복확인) - 중복 발생 X, doc_title null이 있음.
-# SELECT hash_key, doc_id, doc_title, doc_type_id, COUNT(*) AS count
-# FROM view_documents
-# GROUP BY hash_key, doc_id, doc_title, doc_type_id
+# #(중복확인)
+# SELECT publish_Id, COUNT(*) AS count
+# FROM view_institutions
+# GROUP BY publish_Id
 # HAVING COUNT(*) > 1;
+
+
+#2. documents (updated: publish_Id → FK) 3부분으로 구성.
 
 #2.1 document_id value set
 CREATE VIEW view_documents_id AS
@@ -49,16 +27,27 @@ SELECT DISTINCT
 FROM allrecords2
 WHERE hash_key IS NOT NULL AND doc_id IS NOT NULL;
 
-#(중복확인) - 중복 발생 X, doc_title null이 있음.  #2. document_id 값 (새로운 table, MVD)
-# doc_id와 doc_title 분리
+# #(중복확인) - 중복 발생 X, doc_title null이 있음.  #2. document_id 값 (새로운 table, MVD)
+# # doc_id와 doc_title 분리
 SELECT hash_key, doc_id,  COUNT(*) AS count
 FROM view_documents_id
 GROUP BY hash_key, doc_id
 HAVING COUNT(*) > 1;
+#
 
-SELECT *
-FROM allrecords2
-WHERE doc_id IS NOT NULL AND doc_type_Id IS NULL ;
+CREATE VIEW view_documents_id_test AS
+SELECT DISTINCT
+    hash_key,
+    doc_id
+ FROM allrecords2
+WHERE hash_key IS NOT NULL AND doc_id IS NOT NULL;
+
+SELECT   COUNT(*) AS count
+FROM view_documents_id_test
+;
+# SELECT *
+# FROM allrecords2
+# WHERE doc_id IS NOT NULL AND doc_type_Id IS NULL ;
 
 #2.2 document_title
 CREATE VIEW view_documents_title AS
@@ -70,17 +59,22 @@ FROM allrecords2
 WHERE hash_key IS NOT NULL AND doc_title IS NOT NULL;
 
 
-SELECT *
-FROM allrecords2
-WHERE doc_title IS NOT NULL AND doc_id IS NULL ;
-
-
-#(중복확인)
-SELECT hash_key, doc_title, doc_id, COUNT(*) AS count
-FROM view_documents_title
-GROUP BY hash_key, doc_title, doc_id
-HAVING COUNT(*) > 1;
-
+# SELECT *
+# FROM allrecords2
+# WHERE doc_title IS NOT NULL AND doc_id IS NULL ;
+#
+#
+# #(중복확인)
+# SELECT hash_key, doc_title, doc_id, COUNT(*) AS count
+# FROM view_documents_title
+# GROUP BY hash_key, doc_title, doc_id
+# HAVING COUNT(*) > 1;
+#
+#
+# SELECT hash_key,  doc_id, COUNT(*) AS count
+# FROM view_documents_title
+# GROUP BY hash_key,   doc_id
+# HAVING COUNT(*) > 1;
 
 #2.3 document_post
 CREATE VIEW view_documents_post AS
@@ -97,50 +91,50 @@ SELECT DISTINCT
 FROM allrecords2
 WHERE hash_key IS NOT NULL AND publish_Id IS NOT NULL;
 
-SELECT *
-FROM allrecords2
-WHERE publish_Id IS NOT NULL AND doc_id IS NULL ;
-
-#(중복확인)
-SELECT hash_key, COUNT(*) AS count
-FROM view_documents_post
-GROUP BY hash_key
-HAVING COUNT(*) > 1;
+# SELECT *
+# FROM allrecords2
+# WHERE publish_Id IS NOT NULL AND doc_id IS NULL ;
+#
+# #(중복확인)
+# SELECT hash_key, COUNT(*) AS count
+# FROM view_documents_post
+# GROUP BY hash_key
+# HAVING COUNT(*) > 1;
 
 # 3. files
 CREATE VIEW view_files AS
 
-    (SELECT DISTINCT
-        file_id ,
-        file_content_id ,
-        file_name ,
-        file_download_url,
-        hash_key
-    FROM allrecords2
-    WHERE hash_key IS NOT NULL
-);
+(SELECT DISTINCT
+     file_id ,
+     file_content_id ,
+     file_name ,
+     file_download_url,
+     hash_key
+FROM allrecords2
+WHERE hash_key IS NOT NULL AND file_id IS NOT NULL
+    );
 
-#(중복확인)
-SELECT hash_key, file_id, COUNT(*) AS count
-FROM view_files
-GROUP BY hash_key, file_id
-HAVING COUNT(*) > 1;
+# #(중복확인)
+# SELECT hash_key, file_id, COUNT(*) AS count
+# FROM view_files
+# GROUP BY hash_key, file_id
+# HAVING COUNT(*) > 1;
 
 
 #4. document_keywords + (doc_title, topic) 정규화 필요
 CREATE VIEW  view_document_keywords AS(
-                                 SELECT DISTINCT
-                                   hash_key,
-                                   keyword
-                                  FROM allrecords2
-                                  WHERE hash_key IS NOT NULL
-);
+                                      SELECT DISTINCT
+                                          hash_key,
+                                          keyword
+                                      FROM allrecords2
+                                      WHERE hash_key IS NOT NULL AND keyword IS NOT NULL
+                                          );
 
-#(중복확인)
-SELECT hash_key, keyword, COUNT(*) AS count
-FROM view_document_keywords
-GROUP BY hash_key, keyword
-HAVING COUNT(*) > 1;
+# #(중복확인)
+# SELECT hash_key, keyword, COUNT(*) AS count
+# FROM view_document_keywords
+# GROUP BY hash_key, keyword
+# HAVING COUNT(*) > 1;
 
 #5. users
 CREATE VIEW view_users AS (
@@ -155,67 +149,35 @@ CREATE VIEW view_users AS (
                           WHERE id IS NOT NULL
                               );
 
-#(중복확인) - 중복없음
-SELECT id, COUNT(*) AS count
-FROM view_users
-GROUP BY id
-HAVING COUNT(*) > 1;
+# #(중복확인) - 중복없음
+# SELECT id, COUNT(*) AS count
+# FROM view_users
+# GROUP BY id
+# HAVING COUNT(*) > 1;
 
 # 6. saved_documents  (user_id, doc_id, topic 들어가지 않을까?
 
-CREATE VIEW view_saved_documents_m AS(
+CREATE VIEW view_saved_documents AS(
                                    SELECT DISTINCT
                                        saved_doc_hash_key,
                                        user_id ,doc_id, topic, user_email,
                                        saved_doc_date
                                    FROM allrecords2
-                                   WHERE saved_doc_hash_key IS NOT NULL
+                                   WHERE saved_doc_hash_key IS NOT NULL AND
+                                       doc_id IS NOT NULL AND
+                                       user_id IS NOT  NULL AND
+                                       saved_doc_date IS NOT NULL AND
+                                       user_email IS NOT NULL
                                        );
-#(중복확인) - 중복없음
-SELECT saved_doc_hash_key, doc_id, user_id, saved_doc_date, user_email, COUNT(*) AS count
-FROM view_saved_documents_m
-GROUP BY saved_doc_hash_key, doc_id, user_id, saved_doc_date, user_email
-HAVING COUNT(*) > 1;
+
+# #(중복확인) - 중복없음
+# SELECT saved_doc_hash_key, doc_id, user_id, saved_doc_date, user_email, COUNT(*) AS count
+# FROM view_saved_documents_m
+# GROUP BY saved_doc_hash_key, doc_id, user_id, saved_doc_date, user_email
+# HAVING COUNT(*) > 1;
 
 # 7. announcements
 CREATE VIEW view_announcements AS(
-                        SELECT DISTINCT
-                               hash_key,
-                               category,
-                               announcement ,
-                               content ,
-                               user_id , #사용자 email
-                               reg_date,
-                               mod_date,
-                               is_main_announce
-                            FROM allrecords2
-                            WHERE hash_key IS NOT NULL
-);
-
-#(중복확인)
-SELECT hash_key, COUNT(*) AS count
-FROM view_announcements
-GROUP BY hash_key
-HAVING COUNT(*) > 1;
-
-SELECT *
-FROM allrecords2
-WHERE announcement IS NOT NULL AND user_id IS NULL;
-
-SELECT *
-FROM allrecords2
-WHERE announcement IS NOT NULL AND reg_date IS NULL;
-
-SELECT *
-FROM allrecords2
-WHERE announcement IS NOT NULL AND content IS NULL;
-
-SELECT *
-FROM allrecords2
-WHERE announcement IS NOT NULL AND mod_date IS NULL;
-
-#(수정 version)
-CREATE VIEW view_announcements_m AS(
                                  SELECT DISTINCT
                                      hash_key,
                                      category,
@@ -227,16 +189,24 @@ CREATE VIEW view_announcements_m AS(
                                  FROM allrecords2
                                  WHERE hash_key IS NOT NULL
                                      );
-
-#(중복확인) - 중복없음
-SELECT hash_key, announcement, reg_date, content, mod_date, COUNT(*) AS count
-FROM view_announcements_m
-GROUP BY hash_key, announcement,  reg_date, content, mod_date
-HAVING COUNT(*) > 1;
+#
+# #(중복확인) - 중복없음
+# SELECT hash_key, announcement, reg_date, content, mod_date, COUNT(*) AS count
+# FROM view_announcements
+# GROUP BY hash_key, announcement,  reg_date, content, mod_date
+# HAVING COUNT(*) > 1;
 
 
 
 #STEP2. [TABLE 정의하기]
+# DROP TABLE announcements;
+# DROP TABLE document_keywords;
+# DROP TABLE files;
+# DROP TABLE saved_documents;
+# DROP TABLE users;
+# DROP TABLE documents;
+# DROP TABLE institutions;
+# DROP TABLE documents_title;
 
 -- 1. institutions (NEW: 4NF 정규화)
 CREATE TABLE institutions (
@@ -246,132 +216,301 @@ CREATE TABLE institutions (
 );
 
 -- 2. documents (updated: publish_Id → FK)
-CREATE TABLE documents (
-                   hash_key CHAR(20),
-                   publish_Id TINYINT,
-                   doc_id TINYINT,
-                   doc_type_Id TINYINT,
-                   post_date CHAR(10),
-                   post_writer LONGTEXT,
-                   post_title LONGTEXT,
-                   post_body LONGTEXT,
-                   abstract LONGTEXT,
-                   original_url LONGTEXT,
-                   top_category LONGTEXT,
-                   doc_title LONGTEXT,
-                   topic LONGTEXT,
-                   PRIMARY KEY (hash_key, doc_id),
-                   FOREIGN KEY (publish_Id) REFERENCES institutions(publish_id)
+
+# ---- 2.1. documents_id
+CREATE TABLE documents_id (
+                              hash_key CHAR(20),
+                              doc_id TINYINT,
+                              doc_type_id TINYINT,
+                              PRIMARY KEY (hash_key, doc_id)
 );
+
+# ---- 2.2. documents_title
+CREATE TABLE documents_title (
+                                 hash_key CHAR(20),
+                                 doc_id TINYINT,
+                                 doc_title TEXT,
+                                 doc_title_hash CHAR(64),
+
+                                 PRIMARY KEY (hash_key, doc_title_hash, doc_id),
+                                 FOREIGN KEY (hash_key, doc_id) REFERENCES documents_id(hash_key, doc_id)
+);
+
+# #최대 문자열 길이 확인
+# SELECT MAX(CHAR_LENGTH(doc_title)) AS max_length,
+#        MAX(OCTET_LENGTH(doc_title)) AS max_bytes
+# FROM allrecords2;
+
+
+
+
+# ---- 2.3. documents_post
+CREATE TABLE documents_post (
+                                hash_key CHAR(20) PRIMARY KEY,
+                                publish_Id TINYINT,
+                                post_date CHAR(10),
+                                post_writer LONGTEXT,
+                                post_title LONGTEXT,
+                                post_body LONGTEXT,
+                                abstract LONGTEXT,
+                                original_url LONGTEXT,
+                                top_category LONGTEXT
+                                #FOREIGN KEY (hash_key) REFERENCES documents_id(hash_key) (누락된 hash_key가 나온다는 error발생)
+);
+
 
 -- 3. files
 CREATE TABLE files (
-                       file_id CHAR(20) PRIMARY KEY,
+                       file_id CHAR(20),
                        file_content_id SMALLINT,
                        file_name LONGTEXT,
                        file_download_url LONGTEXT,
                        hash_key CHAR(20),
-                       FOREIGN KEY (hash_key) REFERENCES documents(hash_key)
+                       PRIMARY KEY (file_id, hash_key)
+                       #FOREIGN KEY (hash_key) REFERENCES documents_id(hash_key)
 );
+
 
 -- 4. document_keywords
 CREATE TABLE document_keywords (
                                    hash_key CHAR(20),
                                    keyword VARCHAR(255),
-                                   PRIMARY KEY (hash_key, keyword),
-                                   FOREIGN KEY (hash_key) REFERENCES documents(hash_key)
+                                   PRIMARY KEY (hash_key, keyword)
+                                   #FOREIGN KEY (hash_key) REFERENCES documents_id(hash_key)
 );
+
 
 -- 5. users
 CREATE TABLE users (
-                       user_id CHAR(20) PRIMARY KEY,
-                       user_email MEDIUMTEXT,
+                       id VARCHAR(255) PRIMARY KEY,
+                       email MEDIUMTEXT,
                        name MEDIUMTEXT,
                        institution MEDIUMTEXT,
                        title MEDIUMTEXT,
-                       registered_date DATE
+                       registered_date DATE,
+                       email_hash CHAR(64) #save_document 식별을 위한 (BLOB/TEXT 제약 우회를 위해 사용
 );
 
--- 6. saved_documents
+
+-- 6. saved_documents (documents 연결)
 CREATE TABLE saved_documents (
-                                 user_id CHAR(20),
                                  saved_doc_hash_key CHAR(20),
+                                 user_id VARCHAR(255),
+                                 doc_id TINYINT,
+                                 topic LONGTEXT,
+                                 user_email MEDIUMTEXT,
                                  saved_doc_date DATE,
-                                 PRIMARY KEY (user_id, saved_doc_hash_key),
-                                 FOREIGN KEY (user_id) REFERENCES users(user_id),
-                                 FOREIGN KEY (saved_doc_hash_key) REFERENCES documents(hash_key)
+                                 user_email_hash CHAR(64),
+
+                                 PRIMARY KEY (saved_doc_hash_key, user_id, doc_id, saved_doc_date, user_email_hash)
+
+#                                  FOREIGN KEY (user_email_hash) REFERENCES users(email_hash) #hash
 );
 
--- 7. managers
-CREATE TABLE managers (
-                          id VARCHAR(255) PRIMARY KEY,
-                          email MEDIUMTEXT
-);
+# SELECT * FROM users limit 5;
+#
+# SELECT * FROM allrecords2 WHERE hash_key = '10008349223458858575';
 
--- 8. announcements
+
+-- 7. announcements
 CREATE TABLE announcements (
                                hash_key CHAR(20),
                                category CHAR(7),
                                announcement TINYTEXT,
                                content TEXT,
-                               user_id CHAR(20),
                                reg_date BIGINT,
                                mod_date BIGINT,
                                is_main_announce TINYINT,
-                               PRIMARY KEY (hash_key, category, user_id),
-                               FOREIGN KEY (hash_key) REFERENCES documents(hash_key),
-                               FOREIGN KEY (user_id) REFERENCES users(user_id)
+                               announcement_hash CHAR(64),
+                               content_hash CHAR(64),
+                               PRIMARY KEY (hash_key, announcement_hash, reg_date, content_hash, mod_date)
+                               #FOREIGN KEY (hash_key) REFERENCES documents_id(hash_key)
 );
 
-
+#hash_key, announcement, reg_date, content, mod_date
 
 
 #STEP3. [VIEW > TABLE 변환하기]
 
 #1. institutions
 INSERT INTO institutions (
-    publish_Id,
     published_institution,
-    publish_institution_url
+    publish_institution_url,
+    publish_Id
 )
 SELECT
-    publish_Id,
     published_institution,
-    publish_institution_url
+    publish_institution_url,
+    publish_Id
 FROM view_institutions;
 
+#2.1. documents_id
+INSERT INTO documents_id (
+    hash_key,
+    doc_id,
+    doc_type_Id
+)
+SELECT
+    hash_key,
+    doc_id,
+    doc_type_Id
+FROM view_documents_id;
 
+#2.2. documents_title (SHA2라는 doc_title 값을 hash로 만들어서 길이가 너무 긴 문제 해결)
+INSERT INTO documents_title (
+    hash_key,
+    doc_id,
+    doc_title,
+    doc_title_hash
+)
+SELECT
+    hash_key,
+    doc_id,
+    doc_title,
+    SHA2(doc_title, 256)
+FROM view_documents_title;
 
-#2. documents
-INSERT INTO documents (
+#2.3. documents_post
+INSERT INTO documents_post (
     hash_key,
     publish_Id,
-    doc_id,
-    doc_type_Id,
     post_date,
     post_writer,
     post_title,
     post_body,
     abstract,
     original_url,
-    top_category,
-    doc_title,
-    topic
+    top_category
 )
 SELECT
     hash_key,
     publish_Id,
-    doc_id,
-    doc_type_Id,
     post_date,
     post_writer,
     post_title,
     post_body,
     abstract,
     original_url,
-    top_category,
-    doc_title,
-    topic
-FROM view_documents;
+    top_category
+FROM view_documents_post;
 
-# ...
+
+#누락된 hash_key 값 확인
+# SELECT DISTINCT hash_key
+# FROM view_documents_post
+# WHERE hash_key NOT IN (
+#     SELECT hash_key FROM documents_id
+# );
+
+
+
+
+#3. files
+INSERT INTO files (
+    file_id,
+    file_content_id,
+    file_name,
+    file_download_url,
+    hash_key
+)
+SELECT
+    file_id,
+    file_content_id,
+    file_name,
+    file_download_url,
+    hash_key
+FROM view_files;
+
+
+# 4. document_keywords
+INSERT INTO document_keywords (
+    hash_key,
+    keyword
+)
+SELECT
+    hash_key,
+    keyword
+FROM view_document_keywords;
+
+# 5. users
+INSERT INTO users (
+    id,
+    email,
+    name,
+    institution,
+    title,
+    registered_date,
+    email_hash
+)
+SELECT
+    id,
+    email,
+    name,
+    institution,
+    title,
+    registered_date,
+    SHA2(email, 256)
+FROM view_users;
+
+# 6. saved_documents
+INSERT INTO saved_documents (
+    saved_doc_hash_key,
+    user_id,
+    doc_id,
+    topic,
+    user_email,
+    saved_doc_date,
+    user_email_hash
+)
+SELECT
+    saved_doc_hash_key,
+    user_id,
+    doc_id,
+    topic,
+    user_email,
+    saved_doc_date,
+    SHA2(user_email, 256)
+FROM view_saved_documents;
+
+#7. announcements
+INSERT INTO announcements (
+    hash_key,
+    category,
+    announcement,
+    content,
+    reg_date,
+    mod_date,
+    is_main_announce,
+    announcement_hash,
+    content_hash
+)
+SELECT
+    hash_key,
+    category,
+    announcement,
+    content,
+    reg_date,
+    mod_date,
+    is_main_announce,
+    SHA2(announcement, 256),
+    SHA2(content, 256)
+FROM view_announcements;
+
+#issue(hash_key 로 서로 참조하는 관계가 일부 TABLE은 의도한 대로 만들어지지않았습니다.)
+
+
+#STEP4. TABLE별 크기 조회
+SELECT
+    table_name,
+    ROUND(data_length / 1024 / 1024, 2) AS data_mb,
+    ROUND(index_length / 1024 / 1024, 2) AS index_mb,
+    ROUND((data_length + index_length) / 1024 / 1024, 2) AS total_mb
+FROM information_schema.tables
+WHERE table_schema = DATABASE()
+ORDER BY total_mb DESC;
+
+
+SELECT COUNT(DISTINCT hash_key) FROM allrecords2;
+SELECT COUNT(DISTINCT hash_key) FROM documents_id;
+SELECT COUNT(DISTINCT hash_key) FROM view_documents_id;
+SELECT COUNT(*) FROM allrecords2 WHERE ;

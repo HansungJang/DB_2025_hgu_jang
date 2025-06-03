@@ -1,0 +1,244 @@
+create table allrecords2
+(
+    hash_key                double null,
+    publish_Id              int    null,
+    doc_type_Id             int    null,
+    post_date               text   null,
+    post_writer             text   null,
+    post_title              text   null,
+    post_body               text   null,
+    abstract                text   null,
+    original_url            text   null,
+    top_category            text   null,
+    file_id                 text   null,
+    file_content_id         text   null,
+    file_name               text   null,
+    file_download_url       text   null,
+    published_institution   text   null,
+    publish_institution_url text   null,
+    doc_title               text   null,
+    topic                   text   null,
+    user_email              text   null,
+    keyword                 text   null,
+    saved_doc_date          text   null,
+    saved_doc_hash_key      text   null,
+    id                      text   null,
+    email                   text   null,
+    name                    text   null,
+    institution             text   null,
+    title                   text   null,
+    registered_date         text   null,
+    doc_id                  text   null,
+    category                text   null,
+    announcement            text   null,
+    content                 text   null,
+    user_id                 text   null,
+    reg_date                text   null,
+    mod_date                text   null,
+    is_main_announce        text   null
+);
+
+create table documents_id
+(
+    hash_key    char(20) not null,
+    doc_id      tinyint  not null,
+    doc_type_id tinyint  null,
+    primary key (hash_key, doc_id)
+);
+
+create table announcements
+(
+    hash_key          char(20) not null,
+    category          char(7)  null,
+    announcement      tinytext null,
+    content           text     null,
+    reg_date          bigint   null,
+    mod_date          bigint   null,
+    is_main_announce  tinyint  null,
+    announcement_hash char(64) not null,
+    doc_id            tinyint  null,
+    primary key (hash_key, announcement_hash),
+    constraint announcements_ibfk_1
+        foreign key (hash_key, doc_id) references documents_id (hash_key, doc_id)
+);
+
+create index hash_key
+    on announcements (hash_key, doc_id);
+
+create table document_keywords
+(
+    hash_key char(20)     not null,
+    keyword  varchar(255) not null,
+    doc_id   tinyint      not null,
+    primary key (hash_key, keyword, doc_id),
+    constraint document_keywords_ibfk_1
+        foreign key (hash_key, doc_id) references documents_id (hash_key, doc_id)
+);
+
+create index hash_key
+    on document_keywords (hash_key, doc_id);
+
+create table documents_post
+(
+    hash_key     char(20) not null,
+    publish_Id   tinyint  null,
+    post_date    char(10) null,
+    post_writer  longtext null,
+    post_title   longtext null,
+    post_body    longtext null,
+    abstract     longtext null,
+    original_url longtext null,
+    top_category longtext null,
+    doc_id       tinyint  not null,
+    primary key (hash_key, doc_id),
+    constraint documents_post_ibfk_1
+        foreign key (hash_key, doc_id) references documents_id (hash_key, doc_id)
+);
+
+create table documents_title
+(
+    hash_key       char(20) not null,
+    doc_id         tinyint  not null,
+    doc_title      text     null,
+    doc_title_hash char(64) not null,
+    topic          longtext null,
+    primary key (hash_key, doc_title_hash, doc_id),
+    constraint documents_title_ibfk_1
+        foreign key (hash_key, doc_id) references documents_id (hash_key, doc_id)
+);
+
+create index hash_key
+    on documents_title (hash_key, doc_id);
+
+create table files
+(
+    file_id           char(20) not null,
+    file_content_id   smallint null,
+    file_name         longtext null,
+    file_download_url longtext null,
+    hash_key          char(20) not null,
+    doc_id            tinyint  not null,
+    primary key (file_id, hash_key, doc_id),
+    constraint files_ibfk_1
+        foreign key (hash_key, doc_id) references documents_id (hash_key, doc_id)
+);
+
+create index hash_key
+    on files (hash_key, doc_id);
+
+create table institutions
+(
+    publish_Id              tinyint  not null,
+    published_institution   longtext null,
+    publish_institution_url longtext null,
+    hash_key                char(20) not null,
+    primary key (publish_Id, hash_key)
+);
+
+create table users
+(
+    id              varchar(255) not null
+        primary key,
+    email           mediumtext   null,
+    name            mediumtext   null,
+    institution     mediumtext   null,
+    title           mediumtext   null,
+    registered_date date         null,
+    email_hash      char(64)     null,
+    constraint email_hash
+        unique (email_hash)
+);
+
+create table saved_documents
+(
+    saved_doc_hash_key char(20)     not null,
+    user_id            varchar(255) not null,
+    doc_id             tinyint      not null,
+    topic              longtext     null,
+    user_email         mediumtext   null,
+    saved_doc_date     date         not null,
+    user_email_hash    char(64)     not null,
+    id                 varchar(255) null,
+    hash_key           char(20)     null,
+    primary key (saved_doc_hash_key, user_id, doc_id, saved_doc_date, user_email_hash),
+    constraint saved_documents_ibfk_1
+        foreign key (hash_key, doc_id) references documents_id (hash_key, doc_id),
+    constraint saved_documents_ibfk_2
+        foreign key (user_email_hash, id) references users (email_hash, id)
+);
+
+create index hash_key
+    on saved_documents (hash_key, doc_id);
+
+create index user_email_hash
+    on saved_documents (user_email_hash, id);
+
+create definer = root@localhost view crawl_hist as
+select distinct `d_post`.`post_title`          AS `post_title`,
+                `d_post`.`post_writer`         AS `post_writer`,
+                `inst`.`published_institution` AS `published_institution`,
+                `d_post`.`post_date`           AS `post_date`
+from (`db_phase1`.`documents_post` `d_post` join `db_phase1`.`institutions` `inst`
+      on (((`d_post`.`publish_Id` = `inst`.`publish_Id`) and (`d_post`.`hash_key` = `inst`.`hash_key`))))
+where (`d_post`.`post_date` is not null)
+order by `d_post`.`post_date`;
+
+create definer = root@localhost view doc_count as
+select count(distinct `db_phase1`.`documents_id`.`hash_key`) AS `COUNT(DISTINCT documents_id.hash_key)`
+from `db_phase1`.`documents_id`;
+
+create definer = root@localhost view doc_top3_topics as
+with `d_2021` as (select distinct `d_title`.`topic` AS `topic`, `d_post`.`post_date` AS `post_date`
+                  from (`db_phase1`.`documents_title` `d_title` join `db_phase1`.`documents_post` `d_post`
+                        on (((`d_title`.`hash_key` = `d_post`.`hash_key`) and
+                             (`d_title`.`doc_id` = `d_post`.`doc_id`))))
+                  where (year(`d_post`.`post_date`) = 2021))
+select `d_2021`.`topic` AS `topic`, count(0) AS `num_docs`
+from (`d_2021` join (select `db_phase1`.`frequency`.`tfidf_word` AS `tfidf_word`,
+                            count(0)                             AS `cnt`,
+                            sum(`db_phase1`.`frequency`.`score`) AS `score`
+                     from `db_phase1`.`frequency`
+                     group by `db_phase1`.`frequency`.`tfidf_word`
+                     order by `cnt` desc) `f` on ((`d_2021`.`topic` = `f`.`tfidf_word`)))
+group by `d_2021`.`topic`
+order by `num_docs`
+limit 3;
+
+create definer = root@localhost view file_summary as
+select distinct `db_phase1`.`files`.`file_id`           AS `file_id`,
+                `db_phase1`.`files`.`file_name`         AS `file_name`,
+                `db_phase1`.`files`.`file_download_url` AS `file_download_url`,
+                `db_phase1`.`files`.`file_content_id`   AS `file_content_id`
+from `db_phase1`.`files`;
+
+create definer = root@localhost view inst_pubcount_3rd as
+with `rank_counts` as (select `db_phase1`.`institutions`.`published_institution` AS `published_institution`,
+                              count(0)                                           AS `CNT`,
+                              dense_rank() OVER (ORDER BY count(0) desc )        AS `rnk`
+                       from `db_phase1`.`institutions`
+                       group by `db_phase1`.`institutions`.`published_institution`)
+select `rank_counts`.`published_institution` AS `published_institution`, `rank_counts`.`CNT` AS `CNT`
+from `rank_counts`
+where (`rank_counts`.`rnk` = 3);
+
+create definer = root@localhost view user_count as
+select count(distinct `db_phase1`.`users`.`id`) AS `COUNT(DISTINCT users.id)`
+from `db_phase1`.`users`;
+
+create definer = root@localhost view user_instcount as
+with `user_institution` as (select `db_phase1`.`users`.`institution`           AS `institution`,
+                                   `db_phase1`.`users`.`title`                 AS `title`,
+                                   dense_rank() OVER (ORDER BY count(0) desc ) AS `rnk`
+                            from `db_phase1`.`users`
+                            group by `db_phase1`.`users`.`institution`, `db_phase1`.`users`.`title`)
+select `user_institution`.`institution` AS `institution`, `user_institution`.`title` AS `title`
+from `user_institution`
+where (`user_institution`.`rnk` = 2);
+
+create definer = root@localhost view year_pubcount as
+select year(`db_phase1`.`documents_post`.`post_date`) AS `post_year`, count(0) AS `cnt`
+from `db_phase1`.`documents_post`
+group by `post_year`
+order by `cnt` desc;
+
+
